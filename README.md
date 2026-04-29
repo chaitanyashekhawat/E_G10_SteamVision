@@ -166,14 +166,14 @@ Interactive dashboard to explore:
 
 ##  Team
 
-| Role | Member |
-|------|--------|
-| Project Lead | Member 1 |
-| Data Lead | Member 2 |
-| ETL Lead | Member 3 |
-| Analysis Lead | Member 4 |
-| Visualization Lead | Member 5 |
-| Strategy & PPT | Member 6 |
+| Name               | Data | ETL | EDA | Stats | Tableau | Report | PPT |
+|--------------------|------|-----|-----|-------|----------|--------|-----|
+| Guru Manohar       | ✔    | ✔   | ✔   | ✔     | ✔        | ✔      | -   |
+| Yashvi Goyal       | -    | -   | -   | ✔     | ✔        | ✔      | -   |
+| Ansh Tomar         | -    | -   | -   | ✔     | ✔        | -      | -   |
+| Navprabhat Singh   | -    | -   | -   | ✔     | -        | ✔      | ✔   |
+| Raghvendra Singh   | -    | -   | -   | -     | -        | -      | -   |
+| Chaitanya Shekhawat| -    | -   | -   | -     | -        | -      | -   |
 
 ---
 
