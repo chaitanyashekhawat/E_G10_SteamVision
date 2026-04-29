@@ -1,0 +1,660 @@
+\documentclass[12pt,a4paper]{report}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{xcolor}
+
+\onehalfspacing
+
+\begin{document}
+
+% ---------------- COVER PAGE ----------------
+\begin{titlepage}
+\centering
+
+{\Huge \textbf{Steam Games Analytics}}\\[0.5cm]
+{\Large Predicting Steam Game Success Using Player Reach, Reviews, and Market Outcomes}\\[1.25cm]
+
+{\large Sector: Gaming / Digital Entertainment}\\[0.5cm]
+
+\textbf{Team ID: E\_G10}\\[0.5cm]
+\textbf{Institute: Newton School of Technology}\\[1cm]
+
+\textbf{Team Members:}\\
+Guru Manohar Gupta \\
+Yashvi Goyal \\
+Ansh Tomar \\
+Navprabhat Singh \\
+Raghvendra Singh \\
+Chaitanya Singh \\[1cm]
+
+\textbf{GitHub Repository:}\\
+\url{https://github.com/GuruManoharGuptaBaratam/E_G10_SteamVision}\\[0.5cm]
+
+\textbf{Tableau Dashboard URL:}\\
+\url{https://public.tableau.com/views/SteamVisionAnalysis/Dashboard3?:language=en-GB&publish=yes&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link}\\[1cm]
+
+\textbf{Submission Date: April 2026}
+
+\vfill
+\end{titlepage}
+
+% ---------------- EXECUTIVE SUMMARY ----------------
+\chapter*{Executive Summary}
+
+The project studies what separates a commercially successful Steam game from the large number of titles that remain niche. The core business question is: \textit{what factors actually drive market success, and how can a developer estimate the likely outcome of a game before investing heavily in launch and promotion?}
+
+To answer this, the team built a Python-based analytics pipeline around a Steam games dataset covering \textbf{66,427 unique games} released between \textbf{7 February 2006} and \textbf{31 December 2023}. The workflow included data extraction, dataset merging, cleaning, type standardization, missing-value treatment, feature engineering, exploratory analysis, statistical validation, and dashboard preparation for business users.
+
+The cleaned analytical dataset contains \textbf{20 fields}, while the final business-facing success dataset contains \textbf{11 decision-ready columns}. During preprocessing, \textbf{1,144 duplicate records} were removed, missing categorical values were standardized, \textbf{19,804 missing review-percentage values} were recalculated from positive and negative review counts, and Steam application identifiers were extracted from links for reliable joining and downstream tracking.
+
+Three outputs drive the final business interpretation:
+\begin{itemize}
+\item A cleaned Steam analytics dataset for analysis
+\item A \textbf{Commercial Success Index (CSI)} combining reach and review traction
+\item A \textbf{market outcome label} that classifies each game as Hit, Average, or Niche/Fail
+\end{itemize}
+
+The analysis shows that \textbf{review volume and player reach are far more predictive of market success than rating alone}. The correlation between \texttt{total\_reviews} and \texttt{all\_time\_peak} is \textbf{0.670}, whereas the correlation between \texttt{rating} and \texttt{all\_time\_peak} is only \textbf{0.042}. A log-log regression further shows that review count alone explains approximately \textbf{74.3\%} of the variation in peak player counts across games with nonzero activity.
+
+The market itself is highly concentrated: \textbf{60.04\%} of games fall into the \textbf{Niche/Fail} outcome band, while only \textbf{20.48\%} qualify as \textbf{Hit}. This implies that the median Steam release is not a breakout product; it is a small-scale title with limited reach. Strategy, RPG, and Free-to-Play categories show stronger success floors than Casual and Indie on median peak-player performance.
+
+Overall, the report concludes that \textbf{commercial success on Steam is driven more by traction and discoverability than by rating in isolation}. For decision makers, the most practical implication is to evaluate a game using early traction indicators, review accumulation, and genre positioning rather than relying on quality scores alone.
+
+\newpage
+
+% ---------------- SECTOR CONTEXT ----------------
+\chapter{Sector \& Business Context}
+
+The digital games industry is a hit-driven market in which a small number of titles capture a disproportionately large share of player attention, engagement, and revenue. Steam, one of the largest PC game distribution platforms, offers an especially useful environment for analysis because each title leaves behind measurable public signals such as player concurrency, review counts, review quality, release timing, and genre classification.
+
+From a business perspective, developers and publishers face two recurring risks:
+\begin{itemize}
+\item investing in games that do not achieve enough traction after launch
+\item overvaluing product quality scores without understanding whether the game can actually reach and retain a large audience
+\end{itemize}
+
+\textbf{Decision Maker:} Independent studios, publishers, portfolio managers, and product teams evaluating game concepts, launch readiness, and post-launch support.
+
+\textbf{Business Value of the Analysis:}
+\begin{itemize}
+\item Reduces decision risk by quantifying what success looks like on Steam
+\item Helps teams benchmark expected outcomes before allocating budget
+\item Supports portfolio prioritization using traction-oriented metrics
+\item Provides an evidence-based narrative for dashboard-driven decision-making
+\end{itemize}
+
+% ---------------- PROBLEM STATEMENT ----------------
+\chapter{Problem Statement \& Objectives}
+
+\textbf{Final Problem Statement:}
+
+\begin{quote}
+What factors actually drive the commercial success of a Steam game, and how can developers estimate whether a title is likely to become a hit, remain average, or stay niche before committing major resources?
+\end{quote}
+
+\textbf{Core Business Question:} Why do some Steam games achieve strong market traction while many others remain small despite being released in the same platform ecosystem?
+
+\textbf{Decisions Supported by the Project:}
+\begin{itemize}
+\item Whether a game concept shows signals associated with a commercially viable launch
+\item Which metrics should be monitored as early success indicators
+\item How genre, review traction, and player reach should influence release strategy
+\item Which games are likely to require stronger retention or marketing intervention
+\end{itemize}
+
+\textbf{Project Objectives:}
+\begin{itemize}
+\item Clean and standardize a Steam games dataset for reliable business analysis
+\item Measure the relationship between quality, reach, and commercial outcomes
+\item Build a single success score for comparative benchmarking
+\item Create interpretable market outcome bands for business use
+\item Translate the findings into a dashboard and recommendations for decision makers
+\end{itemize}
+
+% ---------------- DATA DESCRIPTION ----------------
+\chapter{Data Description}
+
+\textbf{Primary Source:} Kaggle Steam Releases dataset, enriched with supplementary Steam metadata already present in the project repository.
+
+\textbf{Project Data Assets:}
+\begin{itemize}
+\item \texttt{data/raw/games-release-ALL.csv}: release and review-oriented base file
+\item \texttt{data/raw/game\_data\_all.csv}: supplemental metadata file used in the merge workflow
+\item \texttt{data/merged/merged\_game\_data.csv}: combined working dataset
+\item \texttt{data/processed/cleaned\_game\_data.csv}: cleaned analysis-ready dataset
+\item \texttt{data/processed/final\_success\_analysis.csv}: final decision-oriented dataset
+\end{itemize}
+
+\textbf{Dataset Structure Summary:}
+
+\begin{center}
+\begin{tabular}{p{5cm}p{3cm}p{5cm}}
+\toprule
+\textbf{Dataset} & \textbf{Rows} & \textbf{Purpose} \\
+\midrule
+Raw release file & 66,427 & Base release, reviews, and rating fields \\
+Supplemental metadata file & 67,571 & Steam metadata used to enrich the base release file \\
+Merged working file & 67,571 & Working dataset used in the cleaning notebook before deduplication \\
+Cleaned analytical file & 66,427 & Standardized 20-column dataset used for EDA and statistics \\
+Final success file & 66,427 & 11-column business dataset with CSI and market outcome \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Row-Count Interpretation:} The cleaning notebook starts from the merged working file at \textbf{67,571 rows}. After duplicate removal on the Steam link field, the count drops to \textbf{66,427 unique games}. This is why the merged file is larger than both the cleaned file and the release file ultimately used for analysis.
+
+\textbf{Time Coverage:} 7 February 2006 to 31 December 2023
+
+\textbf{Final Cleaned Feature Count:} 20 columns
+
+\textbf{Final Business Dataset Columns:}
+\begin{itemize}
+\item \texttt{appid}
+\item \texttt{game}
+\item \texttt{release}
+\item \texttt{primary\_genre}
+\item \texttt{developer}
+\item \texttt{publisher}
+\item \texttt{rating}
+\item \texttt{total\_reviews}
+\item \texttt{all\_time\_peak}
+\item \texttt{success\_score}
+\item \texttt{market\_outcome}
+\end{itemize}
+
+\textbf{Key Analytical Fields Used in the Study:}
+\begin{itemize}
+\item \texttt{all\_time\_peak}: strongest measure of actual market reach in the project
+\item \texttt{total\_reviews}: cumulative player traction and market response
+\item \texttt{rating}: perceived quality or satisfaction
+\item \texttt{primary\_genre}: market segmentation variable
+\item \texttt{review\_percentage}: quality ratio used after imputation
+\end{itemize}
+
+\textbf{Observed Data Limitations:}
+\begin{itemize}
+\item The market is extremely skewed by blockbuster titles, so averages alone are misleading
+\item \texttt{detected\_technologies} has 7,194 missing values and is not central to the final model
+\item \texttt{store\_genres} has 57 missing values and \texttt{all\_time\_peak\_date} has 6 missing values
+\item Public Steam review metrics do not directly measure revenue, acquisition cost, or demographic fit
+\item Review behavior may be biased toward highly engaged users rather than the full player base
+\item The project is observational, so correlation should not be interpreted as causation
+\end{itemize}
+
+% ---------------- ETL ----------------
+\chapter{Data Cleaning \& ETL Pipeline}
+
+\textbf{Tools Used:} Python, Pandas, NumPy, regular expressions, CSV-based transformation workflow
+
+\textbf{Pipeline Overview:}
+
+The ETL work was implemented as a notebook-driven Python pipeline and produced a consistent analysis-ready dataset from the merged Steam source files. The final cleaning notebook is \texttt{notebooks/02\_cleaning.ipynb}.
+
+\textbf{Step 1: Structural Cleanup}
+\begin{itemize}
+\item Removed the redundant \texttt{Unnamed: 0} column from the merged dataset
+\item Verified column availability before downstream transformation
+\end{itemize}
+
+\textbf{Step 2: Missing-Value Treatment}
+\begin{itemize}
+\item Filled \textbf{461} missing \texttt{publisher} values with \texttt{Unknown}
+\item Filled \textbf{128} missing \texttt{developer} values with \texttt{Unknown}
+\item Filled \textbf{10} missing \texttt{primary\_genre} values with \texttt{Uncategorized}
+\item Recalculated \textbf{19,804} missing \texttt{review\_percentage} values using the ratio of positive reviews to total reviews
+\end{itemize}
+
+\textbf{Step 3: Feature Engineering}
+\begin{itemize}
+\item Extracted numeric \texttt{appid} values from Steam links using regex
+\item Standardized genre strings by removing numeric identifiers such as \texttt{Action (1)} and converting them to readable labels such as \texttt{Action}
+\end{itemize}
+
+\textbf{Step 4: Type Standardization}
+\begin{itemize}
+\item Converted \texttt{release} and \texttt{all\_time\_peak\_date} to date format
+\item Removed commas from numeric player metrics and converted them into integers
+\item Cleaned \texttt{players\_right\_now}, \texttt{24\_hour\_peak}, and \texttt{all\_time\_peak} for quantitative analysis
+\end{itemize}
+
+\textbf{Step 5: Duplicate Removal}
+\begin{itemize}
+\item Removed \textbf{1,144 duplicate records} based on the Steam link field
+\item Reduced the merged dataset from \textbf{67,571} rows to \textbf{66,427 unique games}
+\end{itemize}
+
+\textbf{Transformation Quality Outcome:}
+\begin{itemize}
+\item Final cleaned dataset size: \textbf{66,427 rows x 20 columns}
+\item Zero missing values remain in core decision fields such as \texttt{game}, \texttt{developer}, \texttt{all\_time\_peak}, \texttt{24\_hour\_peak}, \texttt{players\_right\_now}, and \texttt{review\_percentage}
+\item The cleaned dataset is standardized across all 20 features and becomes the base for EDA, statistical analysis, and dashboarding
+\end{itemize}
+
+\textbf{Why the ETL Matters for Business Use:}
+\begin{itemize}
+\item Ensures fair benchmarking across games
+\item Prevents duplicate titles from inflating genre or market statistics
+\item Converts raw Steam platform signals into a structured foundation for analytics and dashboarding
+\end{itemize}
+
+% ---------------- KPI ----------------
+\chapter{KPI \& Metric Framework}
+
+\textbf{Primary KPI: Commercial Success Index (CSI)}
+
+The project converts commercial performance into a single comparable score called the \textbf{Commercial Success Index}. The index is designed to combine reach and traction rather than relying on rating alone.
+
+\[
+\text{CSI} = \left(0.4 \times \frac{\texttt{all\_time\_peak}}{\max(\texttt{all\_time\_peak})} + 0.6 \times \frac{\texttt{total\_reviews}}{\max(\texttt{total\_reviews})}\right) \times 100
+\]
+
+\textbf{Interpretation of the Weighting:}
+\begin{itemize}
+\item \texttt{all\_time\_peak} contributes \textbf{40\%}: captures maximum observed player reach
+\item \texttt{total\_reviews} contributes \textbf{60\%}: captures sustained market traction and broader user response
+\end{itemize}
+
+\textbf{Why this KPI is appropriate for the project:}
+\begin{itemize}
+\item It aligns with the business problem of measuring market success rather than product quality alone
+\item It combines a real-time performance proxy with a cumulative market-response proxy
+\item It produces a benchmarking score that can be shown directly in the dashboard
+\end{itemize}
+
+\textbf{Supporting Outcome Framework:}
+
+In addition to the CSI, the project defines a discrete market-outcome label:
+\begin{itemize}
+\item \textbf{Hit}: \texttt{all\_time\_peak} $\geq 500$ or \texttt{total\_reviews} $\geq 250$
+\item \textbf{Average}: \texttt{all\_time\_peak} $\geq 100$ or \texttt{total\_reviews} $\geq 50$
+\item \textbf{Niche/Fail}: below both thresholds above
+\end{itemize}
+
+\textbf{Actual Outcome Distribution in the Final Dataset:}
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Market Outcome} & \textbf{Games} & \textbf{Share of Dataset} \\
+\midrule
+Hit & 13,606 & 20.48\% \\
+Average & 12,937 & 19.48\% \\
+Niche/Fail & 39,884 & 60.04\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Implication:} The project demonstrates that the typical Steam release does not break through commercially, which makes early prediction and portfolio screening highly valuable.
+
+% ---------------- EDA ----------------
+\chapter{Exploratory Data Analysis}
+
+\textbf{Purpose of EDA:} To understand the distribution of commercial outcomes and identify the strongest descriptive patterns before statistical testing.
+
+\textbf{1. Market Skew is Extreme}
+
+The dataset is heavily right-skewed. While the mean \texttt{all\_time\_peak} is \textbf{972.89}, the median is only \textbf{7}. Similarly, the mean \texttt{total\_reviews} is \textbf{1,507.35}, while the median is only \textbf{26}. This confirms that a small number of blockbuster games dominate platform visibility.
+
+To keep plots readable, the EDA notebook caps charted values at the 95th percentile:
+\begin{itemize}
+\item 95th percentile of \texttt{all\_time\_peak}: \textbf{1,583.7}
+\item 95th percentile of \texttt{total\_reviews}: \textbf{2,508.7}
+\end{itemize}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.9\textwidth]{./figures/eda_all_time_peak_distribution.png}
+\caption{Histogram of capped all-time peak players showing that most games remain far below blockbuster scale.}
+\end{figure}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.9\textwidth]{./figures/eda_total_reviews_distribution.png}
+\caption{Histogram of capped total reviews showing that most titles collect only a limited amount of market feedback.}
+\end{figure}
+
+\textbf{2. Genre Influences the Success Floor}
+
+The team analyzed the top genres using median all-time peak players, which is more robust than the mean in a heavily skewed market.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Genre} & \textbf{Count} & \textbf{Median Peak} & \textbf{90th Percentile Peak} \\
+\midrule
+Free to Play & 1,830 & 34 & 2,045.0 \\
+Strategy & 4,403 & 18 & 1,177.2 \\
+RPG & 4,144 & 14 & 1,241.5 \\
+Simulation & 4,263 & 11 & 779.4 \\
+Adventure & 8,107 & 8 & 319.4 \\
+Sports & 1,010 & 8 & 332.4 \\
+Racing & 1,136 & 7 & 621.5 \\
+Action & 14,476 & 6 & 674.0 \\
+Casual & 8,111 & 5 & 96.0 \\
+Indie & 17,461 & 5 & 229.0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.9\textwidth]{./figures/eda_genre_median_peak_distribution.png}
+\caption{Genre-level comparison of median all-time peak players across major Steam genres.}
+\end{figure}
+
+\textbf{3. Rating Alone Does Not Guarantee Success}
+
+Games were grouped into rating bands to compare satisfaction with actual reach.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Rating Band} & \textbf{Game Count} & \textbf{Median Peak} & \textbf{Mean Peak} \\
+\midrule
+0--50 & 11,209 & 3 & 206.55 \\
+51--70 & 28,406 & 4 & 522.01 \\
+71--80 & 16,938 & 9 & 705.24 \\
+81--90 & 8,493 & 65 & 2,693.57 \\
+91--100 & 1,375 & 791 & 9,207.84 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.9\textwidth]{./figures/eda_rating_band_vs_peak.png}
+\caption{Comparison of rating bands against peak-player outcomes, showing that only the highest-rated bands consistently break out.}
+\end{figure}
+
+This suggests that quality matters, but not in a linear or sufficient way. There is a large difference between a good rating and a commercially scaled audience.
+
+\textbf{4. Steam Has Become Harder for the Typical Game}
+
+Median all-time peak players were much stronger in earlier years and fell sharply in later years. For example, the median was \textbf{426.5} in 2012, \textbf{425.0} in 2013, \textbf{117.0} in 2014, and only \textbf{5} from 2018 through 2023. This indicates rising competition and discoverability pressure on the platform.
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.9\textwidth]{./figures/release_year_median_success.png}
+\caption{Median all-time peak players by release year, highlighting the decline in typical success over time.}
+\end{figure}
+
+\textbf{EDA Summary:}
+\begin{itemize}
+\item The Steam market is dominated by a few extreme winners
+\item Review traction is more stable than rating as a business signal
+\item Genre positioning changes the probability floor of success
+\item Later-year releases face much tougher competitive conditions
+\end{itemize}
+
+% ---------------- STATISTICS ----------------
+\chapter{Statistical Analysis}
+
+\textbf{Analytical Goal:} Validate whether the patterns seen in EDA remain statistically meaningful and useful for prediction.
+
+\textbf{Hypotheses:}
+\begin{itemize}
+\item $H_0$: Commercial success is not meaningfully associated with the key observed metrics
+\item $H_1$: Commercial success is positively associated with selected market and engagement metrics
+\end{itemize}
+
+\textbf{1. Correlation Analysis}
+
+The correlation matrix was computed on the key numerical variables used in the project.
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Metric} & \textbf{Rating} & \textbf{Total Reviews} & \textbf{All-Time Peak} & \textbf{Positive Reviews} \\
+\midrule
+Rating & 1.000 & 0.058 & 0.042 & 0.062 \\
+Total Reviews & 0.058 & 1.000 & 0.670 & 0.995 \\
+All-Time Peak & 0.042 & 0.670 & 1.000 & 0.618 \\
+Positive Reviews & 0.062 & 0.995 & 0.618 & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Interpretation:}
+\begin{itemize}
+\item \texttt{total\_reviews} has a strong positive relationship with \texttt{all\_time\_peak} (\textbf{0.670})
+\item \texttt{rating} has only a very weak relationship with \texttt{all\_time\_peak} (\textbf{0.042})
+\item Positive review count is almost perfectly aligned with total reviews (\textbf{0.995}), so it behaves more like a scale variable than an independent signal
+\end{itemize}
+
+This matches the main message of the notebook: community traction is much more connected to market success than rating score by itself.
+
+\textbf{2. Genre Difference Test}
+
+To test whether genre differences are real rather than visual noise, the project compared RPG and Casual games on \texttt{all\_time\_peak} using Welch's t-test.
+
+\begin{itemize}
+\item RPG median all-time peak: \textbf{14}
+\item Casual median all-time peak: \textbf{5}
+\item Test statistic: \textbf{3.6417}
+\item p-value: \textbf{0.0002739}
+\end{itemize}
+
+Since the p-value is well below 0.05, the null hypothesis is rejected. The difference between these two genre groups is statistically significant.
+
+\textbf{3. Regression for Success Prediction}
+
+The final statistical model in the notebook predicts \texttt{log10(all\_time\_peak)} using \texttt{log10(total\_reviews)} for games with nonzero activity.
+
+\[
+\log_{10}(\texttt{all\_time\_peak}) = -0.2073 + 0.8730 \cdot \log_{10}(\texttt{total\_reviews})
+\]
+
+\textbf{Model Results from the Notebook Output:}
+\begin{itemize}
+\item Number of observations: \textbf{66,421}
+\item $R^2 = \textbf{0.743}$
+\item Adjusted $R^2 = \textbf{0.743}$
+\item F-statistic: \textbf{1.922 $\times 10^5$}
+\item Intercept: \textbf{-0.2073}
+\item Coefficient of \texttt{log10(total\_reviews)}: \textbf{0.8730}
+\item t-statistic for \texttt{log10(total\_reviews)}: \textbf{438.378}
+\item Coefficient p-value: \textbf{< 0.001}
+\item 95\% confidence interval for the review coefficient: \textbf{[0.869, 0.877]}
+\end{itemize}
+
+\textbf{Interpretation:} Review volume alone explains roughly \textbf{74.3\%} of the variance in peak-player success. This is a strong result for a single-variable model and directly supports the project's decision to emphasize traction and reach in the KPI design. The notebook therefore supports a practical conclusion: if a title is not generating review traction, it is unlikely to achieve a high player peak.
+
+\textbf{Statistical Conclusion:}
+\begin{itemize}
+\item Commercial success on Steam is strongly associated with traction metrics
+\item Rating contributes less predictive value than expected when used alone
+\item Genre differences are statistically meaningful
+\item The project's market-outcome framework is empirically justified
+\end{itemize}
+
+% ---------------- DASHBOARD ----------------
+\chapter{Tableau Dashboard Design}
+
+\textbf{Dashboard Objective:} Provide a business-facing interface that allows a decision maker to benchmark game performance, understand market distribution, and identify success drivers by genre, year, and review traction.
+
+\textbf{Recommended Dashboard Components:}
+\begin{itemize}
+\item KPI cards for total games, median peak, median reviews, and outcome mix
+\item Outcome distribution chart for Hit, Average, and Niche/Fail
+\item Scatter plot of \texttt{total\_reviews} vs \texttt{all\_time\_peak}
+\item Genre comparison chart based on median peak players
+\item Year trend chart for median market success
+\item Filters for genre, release year, and market outcome
+\end{itemize}
+
+\textbf{Why this dashboard design fits the project:}
+\begin{itemize}
+\item It mirrors the actual analytics flow used in the notebooks
+\item It translates technical findings into filters and comparisons that a faculty evaluator or business stakeholder can inspect quickly
+\item It keeps the focus on decision-support rather than decorative visuals
+\end{itemize}
+
+\textbf{Dashboard 1: EXECUTIVE OVERVIEW}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.40\textheight,keepaspectratio]{./tableau/screenshots/executive_dashboard.png}
+\caption{Executive dashboard showing portfolio-level KPIs, yearly release trends, average peak-player trends, and rating movement over time.}
+\end{figure}
+
+\textbf{Short Explanation:} This dashboard serves as the opening summary of the entire analysis. It shows that the dataset contains \textbf{66,427} games, with an \textbf{average user rating of 65.4}, \textbf{average peak players of 973}, \textbf{player retention of 1.84\%}, and \textbf{high-rating share of 40.36\%}. The line charts strengthen the business story: game releases rise sharply after 2015, but average peak-player performance declines after the earlier spikes, indicating that Steam has become more crowded even as more titles enter the market. The rating trend also dips in the mid-period and improves slightly toward the most recent years.
+
+\clearpage
+
+\textbf{Dashboard 2: PLAYER ENGAGEMENT AND RETENTION}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.40\textheight,keepaspectratio]{./tableau/screenshots/engagement_retention.png}
+\caption{Engagement and retention dashboard containing retention KPIs, top games by peak players, genre-level peak comparison, retention distribution, and a peak-vs-current-player scatterplot.}
+\end{figure}
+
+\textbf{Short Explanation:} This dashboard focuses on how many players games attract and how well they retain them. It highlights \textbf{average peak players of 973}, \textbf{average current players of 79}, and \textbf{retention of 1.84\%}, with \textbf{PUBG} identified as the top game by peak audience. The Top 10 chart is dominated by very large multiplayer titles such as PUBG, Counter-Strike, Lost Ark, and Dota 2, showing that the upper end of Steam success is highly concentrated. The retention histogram indicates that most games cluster at very low retention ratios, while the scatterplot separates \textit{Sustained Hits}, \textit{Hidden Gems}, \textit{Hype Games}, and \textit{Failures}, making it easy to distinguish games with durable audiences from those that peaked briefly and declined.
+
+\clearpage
+
+\textbf{Dashboard 3: PLAYER SATISFACTION DASHBOARD}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.40\textheight,keepaspectratio]{./tableau/screenshots/player_satisfaction.png}
+\caption{Player satisfaction dashboard containing positive-review KPIs, developer ranking by rating, genre-vs-rating chart, rating distribution, and review-vs-rating relationship plot.}
+\end{figure}
+
+\textbf{Short Explanation:} This dashboard explains the quality side of the project. It reports a \textbf{positive review percentage of 85.46\%} and an \textbf{average user rating of 65.4}. The developer ranking shows that studios such as \textbf{Re-Logic}, \textbf{Smartly Dressed Games}, and \textbf{Valve} lead the top group by average rating. The genre chart shows strong variation across categories, with \textbf{Design \& Illustration}, \textbf{Game Development}, and \textbf{Adventure} appearing near the top, while categories such as \textbf{Audio Production} are much lower. The review-impact scatterplot reinforces an important conclusion of the report: games with more reviews tend to cluster in stronger rating zones, but low-review titles remain widely scattered, which means satisfaction alone is not a sufficient predictor of commercial success.
+
+\clearpage
+
+\textbf{Dashboard 4: STRATEGY \& OPPORTUNITY}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.40\textheight,keepaspectratio]{./tableau/screenshots/strategy_opportunity.png}
+\caption{Strategy and opportunity dashboard containing portfolio matrix, lifecycle distribution, genre opportunity ranking, and category-level opportunity counts.}
+\end{figure}
+
+\textbf{Short Explanation:} This dashboard is the most decision-oriented screen in the Tableau story. It classifies the full market into \textbf{7,997 Elite Games}, \textbf{3,113 Hidden Gems}, \textbf{5,032 Risk Titles}, and \textbf{49,900 Mid Tier} releases. The portfolio opportunity matrix breaks the market by rating level and reach level, showing that high-rating and high-reach titles are relatively rare, while the largest concentration sits in the low/mid-rating and low/mid-reach quadrant. The lifecycle chart shows \textbf{32,778 Hidden Gems}, \textbf{16,620 Sustained} titles, and \textbf{16,550 Failures}, with a note that no titles currently match the Hype profile under the selected dashboard definition. The genre opportunity ranking then helps identify which genres appear most attractive for future investment under the opportunity-scoring logic used in the dashboard.
+
+\textbf{Dashboard Usage Example:}
+
+A decision maker can begin with the executive dashboard to understand the market baseline, move to engagement and retention to evaluate whether a game attracts a durable player base, use the satisfaction dashboard to assess quality and review performance, and finish with the strategy dashboard to classify the title into an actionable portfolio category.
+
+% ---------------- INSIGHTS ----------------
+\chapter{Insights Summary}
+
+\begin{enumerate}
+\item Steam is a high-failure marketplace: \textbf{60.04\%} of games in the final dataset fall into the \textbf{Niche/Fail} band.
+\item Only \textbf{20.48\%} of games qualify as \textbf{Hit}, which means commercial breakout is the exception rather than the norm.
+\item Review traction matters more than rating alone: \texttt{total\_reviews} has a \textbf{0.670} correlation with \texttt{all\_time\_peak}, while rating has only \textbf{0.042}.
+\item The median Steam game is very small: median \texttt{all\_time\_peak} is only \textbf{7}, and median \texttt{total\_reviews} is only \textbf{26}.
+\item Free-to-Play, Strategy, and RPG provide a stronger success floor than Casual and Indie when measured by median peak players.
+\item High ratings improve outcomes mainly in the top bands; games rated \textbf{91--100} have a median peak of \textbf{791}, far above the rest of the market.
+\item Earlier Steam cohorts had much stronger typical performance than recent cohorts; the median release from \textbf{2018--2023} peaks at only \textbf{5} players.
+\item Review count is powerful enough to explain about \textbf{74.3\%} of the variation in peak-player success in the project's regression model.
+\item Genre differences are statistically significant, as shown by the RPG vs Casual test with \textbf{p = 0.0002739}.
+\item The CSI is useful for benchmarking, but the outcome label is easier for faculty and business users to interpret quickly in the dashboard.
+\end{enumerate}
+
+% ---------------- RECOMMENDATIONS ----------------
+\chapter{Recommendations}
+
+\textbf{1. Evaluate launch readiness using traction thresholds, not rating alone.}\\
+Decision impact: Teams should treat early review accumulation and audience reach as stronger launch signals than satisfaction scores by themselves.
+
+\textbf{2. Use genre-adjusted benchmarks before committing budget.}\\
+Decision impact: A project in Strategy, RPG, or Free-to-Play should be compared against its own genre baseline rather than the full Steam market average.
+
+\textbf{3. Strengthen discoverability and review generation in the first release window.}\\
+Decision impact: Since review volume is strongly associated with peak-player success, early user acquisition and community conversion matter materially.
+
+\textbf{4. Use the Hit / Average / Niche-Fail framework as a portfolio screening tool.}\\
+Decision impact: Publishers can quickly classify titles and decide where to invest more in retention, updates, or promotion.
+
+\textbf{5. Track later-year launches more conservatively.}\\
+Decision impact: The decline in median success for recent years suggests that newer releases need more realistic expectations and stronger go-to-market planning.
+
+% ---------------- IMPACT ----------------
+\chapter{Impact Estimation}
+
+This project does not estimate direct revenue, but it does create a measurable decision-support system that can improve portfolio selection and launch evaluation.
+
+\textbf{Expected Decision Impact:}
+\begin{itemize}
+\item Better identification of low-probability titles before high marketing spend
+\item Faster prioritization of games showing early Hit-level traction
+\item More consistent benchmarking across genres and release windows
+\item Stronger communication between analytics, product, and publishing teams
+\end{itemize}
+
+\textbf{Operational Impact of the Deliverables:}
+\begin{itemize}
+\item A cleaned 66,427-row dataset ready for repeatable analysis
+\item A success score for comparative ranking
+\item An outcome classification that is easy to explain to non-technical stakeholders
+\item A Tableau design that can support live business review meetings
+\end{itemize}
+
+% ---------------- LIMITATIONS ----------------
+\chapter{Limitations}
+
+\begin{itemize}
+\item The success score is normalized against blockbuster maxima, so most games cluster near zero on the raw CSI scale.
+\item The project uses observable Steam engagement signals, not direct revenue or profitability data.
+\item Regression results show strong association, but they do not prove causal relationships.
+\item Outcome thresholds are intentionally interpretable, but they are business rules rather than supervised labels derived from revenue outcomes.
+\item Some metadata fields, especially \texttt{detected\_technologies}, remain incomplete and were not central to the final model.
+\end{itemize}
+
+% ---------------- FUTURE ----------------
+\chapter{Future Scope}
+
+\begin{itemize}
+\item Build a supervised machine learning model to predict market outcome classes
+\item Add NLP-based review sentiment and topic modeling for richer quality signals
+\item Introduce revenue proxies or price data if available
+\item Convert the Tableau prototype into a refreshable production dashboard
+\item Explore cohort analysis by release period, publisher type, or multiplayer status
+\end{itemize}
+
+% ---------------- CONCLUSION ----------------
+\chapter{Conclusion}
+
+This project was designed to address a practical business problem: \textit{how can a team reduce uncertainty before or during a Steam game launch?} The analysis shows that this cannot be answered by rating alone. Instead, commercial performance is shaped by a combination of player reach, community traction, and the market context in which the game is released.
+
+The cleaned dataset, KPI framework, EDA, and statistical testing together show that Steam is a difficult marketplace in which most games remain niche. The median game in the dataset reaches only a very small audience, while a limited number of outliers dominate visibility. Because of this, teams should not judge success by isolated quality signals or anecdotal examples. They need benchmarks that reflect the actual shape of the market.
+
+The project therefore contributes three practical outcomes. First, it creates a cleaned and structured Steam dataset that can support repeatable analysis. Second, it introduces a Commercial Success Index and market-outcome framework that convert technical platform data into interpretable business signals. Third, it translates the findings into dashboard views and recommendations that can help decision makers compare genres, judge launch readiness, and identify whether a title is likely to become a Hit, remain Average, or stay Niche/Fail.
+
+In that sense, the analysis does more than describe Steam performance. It gives developers and publishers a way to think more realistically about success, benchmark their titles against platform evidence, and focus on the signals that matter most for commercial outcomes.
+
+% ---------------- CONTRIBUTION ----------------
+\chapter{Contribution Matrix}
+
+
+
+\begin{longtable}{|p{3.8cm}|c|c|c|c|c|c|}
+\hline
+\textbf{Name} & \textbf{Data} & \textbf{ETL} & \textbf{EDA} & \textbf{Stats} & \textbf{Tableau} & \textbf{Report/PPT} \\
+\hline
+Guru Manohar & Yes & Yes & Yes & Yes & Yes & Yes \\
+\hline
+Yashvi Goyal & - & - & - & Yes & Yes & Yes \\
+\hline
+Ansh Tomar & - & - & - & Yes & Yes & - \\
+\hline
+Navprabhat Singh & - & - & - & Yes & - & Yes \\
+\hline
+Raghvendra Singh & - & - & - & - & - & - \\
+\hline
+Chaitanya Singh & - & - & - & - & - & - \\
+\hline
+\end{longtable}
+
+\end{document}
